@@ -3,13 +3,16 @@ import time
 from selenium import webdriver
 import subprocess
 import argparse
+import os.path
+from tqdm import tqdm
+
 
 parser = argparse.ArgumentParser(description='Downloads all videos from a panopto folder.')
 
 parser.add_argument('url', metavar='URL', type=str,
                     help='The link of the playlist')
-parser.add_argument('path', metavar='IDMPath', help='The path to the IDM executable')
-parser.add_argument('-private', action='store_true', help='Indicates that the video is private, give the user a pause to log in.')
+# parser.add_argument('path', metavar='IDMPath', help='The path to the IDM executable')
+parser.add_argument('-private', action='store_false', help='Indicates that the video is private, give the user a pause to log in. Default: True')
 parser.add_argument('-pause', default=25, help="Pause time to log in. Default is 25 seconds. Change it if the pause is too short.")
 
 args = parser.parse_args()
@@ -20,7 +23,7 @@ private_video = args.private
 # Time window during which the user can log in (in seconds)
 login_pause = args.pause
 # Path of the IDM executable
-PathIDM = args.path
+# PathIDM = args.path
 # URL of the folder of videos to download
 URL = args.url
 
@@ -38,6 +41,11 @@ driver.get(URL)
 # Give user time to login if videos are private
 if private_video:
     time.sleep(login_pause)
+
+# To ensure correct page in case of any redirection
+driver.get(URL)
+# Make sure correct link loads
+time.sleep(5)
 
 # Find all video thumbnails
 el = driver.find_elements_by_class_name("thumbnail-link")
@@ -64,34 +72,19 @@ if private_video:
 print("Parsed URLs: ")
 print(urls)
 
-for el in urls:
+# tqdm iterator
+t = tqdm(enumerate(urls), desc = "Downloading files", leave=True)
+for idx, el in tqdm(urls):
+    print(el)
     URL, name = el
-    subprocess.call([PathIDM, '/d', URL, '/f', '{}'.format(name.replace("/", "-").replace(" ", ""))+'.mp4', '/n', '/s'])
+    name = '{}'.format(name.replace("/", "-").replace(" ", ""))+'.mp4'
+    if os.path.exists(name):
+        i = 1
+        while os.path.exists(f"{name[:-4]}({i}).mp4"):
+            i+=1
+        name = f"{name[:-4]}({i}).mp4"
+    t.set_description(f"Downloading file number {idx}, Name: {name}")
+    subprocess.call(['wget', '-O', name, URL])
 
 driver.close()
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
 
